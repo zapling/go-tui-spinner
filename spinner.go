@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const clearLineAnsiSeq = "\033[2K\r"
+
 var defaultFaces = []string{"|", "/", "—", "\\", "|", "/", "—", "\\"}
 
 func New(out io.Writer) *Spinner {
@@ -39,8 +41,7 @@ func (s *Spinner) Run(ctx context.Context) {
 			continue
 		}
 
-		// TODO: ctx should be parent of waitCtx?
-		s.waitCtx, s.waitCtxCancel = context.WithCancel(context.Background())
+		s.waitCtx, s.waitCtxCancel = context.WithCancel(ctx)
 
 		fmt.Fprint(s.Out, s.Faces[faceIndex])
 
@@ -55,7 +56,7 @@ func (s *Spinner) Run(ctx context.Context) {
 		if faceIndex == len(s.Faces) {
 			faceIndex = 0
 		}
-		fmt.Fprint(s.Out, "\033[2K\r")
+		fmt.Fprint(s.Out, clearLineAnsiSeq)
 	}
 }
 
@@ -64,7 +65,7 @@ func (s *Spinner) RunAsync() context.CancelFunc {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	go s.Run(ctx)
 	return func() {
-		fmt.Fprint(s.Out, "\033[2K\r")
+		fmt.Fprint(s.Out, clearLineAnsiSeq)
 		cancelFunc()
 	}
 }
@@ -76,7 +77,7 @@ func (s *Spinner) Println(a ...any) {
 	s.isPrintingText = true
 	if s.isRunning {
 		s.waitCtxCancel()
-		fmt.Fprint(s.Out, "\033[2K\r")
+		fmt.Fprint(s.Out, clearLineAnsiSeq)
 	}
 
 	fmt.Fprintln(s.Out, a...)
