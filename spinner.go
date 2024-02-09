@@ -17,6 +17,7 @@ type Spinner struct {
 	Out   io.Writer
 	Faces []string
 
+	isRunning      bool
 	isPrintingText bool
 	waitCtx        context.Context
 	waitCtxCancel  context.CancelFunc
@@ -24,9 +25,12 @@ type Spinner struct {
 
 // Run starts the spinner in blocking way and runs until the context is cancelled.
 func (s *Spinner) Run(ctx context.Context) {
+	s.isRunning = true
+
 	faceIndex := 0
 	for {
 		if ctx.Err() != nil {
+			s.isRunning = false
 			return
 		}
 
@@ -67,8 +71,10 @@ func (s *Spinner) RunAsync() context.CancelFunc {
 // If the spinner is stopped text will be printed as expected.
 func (s *Spinner) Println(a ...any) {
 	s.isPrintingText = true
-	s.waitCtxCancel()
-	fmt.Fprint(s.Out, "\033[2K\r")
+	if s.isRunning {
+		s.waitCtxCancel()
+		fmt.Fprint(s.Out, "\033[2K\r")
+	}
 
 	fmt.Fprintln(s.Out, a...)
 	s.isPrintingText = false
