@@ -63,7 +63,10 @@ func (s *Spinner) Run(ctx context.Context) {
 func (s *Spinner) RunAsync() context.CancelFunc {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	go s.Run(ctx)
-	return cancelFunc
+	return func() {
+		fmt.Fprint(s.Out, "\033[2K\r")
+		cancelFunc()
+	}
 }
 
 // Println can be used to print any text while the spinner is running. The spinner will be
