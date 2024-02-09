@@ -76,7 +76,9 @@ func (s *Spinner) RunAsync() context.CancelFunc {
 func (s *Spinner) Println(a ...any) {
 	s.isPrintingText = true
 	if s.isRunning {
-		s.waitCtxCancel()
+		if s.waitCtxCancel != nil {
+			s.waitCtxCancel()
+		}
 		fmt.Fprint(s.Out, clearLineAnsiSeq)
 	}
 
