@@ -15,9 +15,15 @@ func New(out io.Writer) *Spinner {
 	return &Spinner{Out: out, Faces: defaultFaces}
 }
 
+func (s *Spinner) WithText(t string) *Spinner {
+	s.Text = t
+	return s
+}
+
 type Spinner struct {
 	Out   io.Writer
 	Faces []string
+	Text  string
 
 	isDone  bool
 	printCh chan []any
@@ -48,7 +54,7 @@ func (s *Spinner) Println(a ...any) {
 }
 
 func (s *Spinner) run(ctx context.Context, printCh chan []any, doneCh chan struct{}) {
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	faces := s.Faces
@@ -75,7 +81,11 @@ func (s *Spinner) renderPrintln(a ...any) {
 }
 
 func (s *Spinner) renderFace(index int, faces []string) int {
-	fmt.Fprint(s.Out, faces[index])
+	str := faces[index]
+	if s.Text != "" {
+		str += " " + s.Text
+	}
+	fmt.Fprint(s.Out, str)
 	index++
 	if index == len(faces) {
 		return 0
