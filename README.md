@@ -8,35 +8,32 @@ A dead simple TUI spinner
 package main
 
 import (
-	"os"
-	"time"
+    "os"
+    "time"
 
-	spinner "github.com/zapling/go-tui-spinner"
+    spinner "github.com/zapling/go-tui-spinner"
 )
 
 func main() {
-	s := spinner.New(os.Stdout)
-	stop := s.RunAsync()
+    ctx, cancel := context.WithCancel(context.Background())
 
-	s.Println("Some text while the spinner is spinning")
+    s := spinner.New(os.Stdout)
+    s.Run(ctx)
 
-	// Some slow process
-	for i := 0; i < 3; i++ {
-		s.Println("Processing slow thing")
-		time.Sleep(1 * time.Second)
-	}
+    s.Println("Some progress is being made")
 
-	stop()
+    cancel() // Stop the spinner
 
-	s.Println("We are done processing that thing")
+    s.Println("Message after the spinner is stopped")
 
-	stop = s.RunAsync()
+    ctx, cancel = context.WithCancel(context.Background())
 
-	s.Println("Processing one last thing")
+    s.Run(ctx) // Restart spinner
 
-	time.Sleep(1 * time.Second)
-	stop()
+    s.Print("Spinner can be restarted")
 
-	s.Println("We are fully done!")
+    cancel()
+
+    time.Sleep(100 * time.Millisecond) // Give the cleanup time to delete the spinner fully
 }
 ```
