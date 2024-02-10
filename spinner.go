@@ -73,6 +73,7 @@ func (s *Spinner) run(ctx context.Context, printCh chan []any, doneCh chan struc
 		case values := <-printCh:
 			s.clearLine()
 			s.renderPrintln(values...)
+			faceIndex = s.renderFace(faceIndex, faces)
 		}
 	}
 }
