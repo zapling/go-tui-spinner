@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"time"
 )
 
@@ -25,19 +26,19 @@ type Spinner struct {
 	Faces []string
 	Text  string
 
-	isDone  bool
+	isDone  atomic.Bool
 	printCh chan []any
 }
 
 func (s *Spinner) Run(ctx context.Context) {
-	s.isDone = false
+	s.isDone.Swap(false)
 
 	doneCh := make(chan struct{})
 	printCh := make(chan []any)
 
 	go func() {
 		<-doneCh
-		s.isDone = true
+		s.isDone.Swap(true)
 	}()
 
 	go s.run(ctx, printCh, doneCh)
@@ -45,7 +46,7 @@ func (s *Spinner) Run(ctx context.Context) {
 }
 
 func (s *Spinner) Println(a ...any) {
-	if s.isDone {
+	if s.isDone.Load() {
 		s.renderPrintln(a...)
 		return
 	}
