@@ -19,69 +19,70 @@ type Spinner struct {
 	Out   io.Writer
 	Faces []string
 
-	isRunning      bool
-	isPrintingText bool
-	waitCtx        context.Context
-	waitCtxCancel  context.CancelFunc
+	isDone  bool
+	printCh chan []any
 }
 
-// Run starts the spinner in blocking way and runs until the context is cancelled.
 func (s *Spinner) Run(ctx context.Context) {
-	s.isRunning = true
+	s.isDone = false
 
-	faceIndex := 0
-	for {
-		if ctx.Err() != nil {
-			s.isRunning = false
-			return
-		}
+	doneCh := make(chan struct{})
+	printCh := make(chan []any)
 
-		if s.isPrintingText {
-			time.Sleep(200 * time.Millisecond)
-			continue
-		}
+	go func() {
+		<-doneCh
+		s.isDone = true
+	}()
 
-		s.waitCtx, s.waitCtxCancel = context.WithCancel(ctx)
-
-		fmt.Fprint(s.Out, s.Faces[faceIndex])
-
-		select {
-		case <-s.waitCtx.Done():
-			break
-		case <-time.After(200 * time.Millisecond):
-			break
-		}
-
-		faceIndex++
-		if faceIndex == len(s.Faces) {
-			faceIndex = 0
-		}
-		fmt.Fprint(s.Out, clearLineAnsiSeq)
-	}
+	go s.run(ctx, printCh, doneCh)
+	s.printCh = printCh
 }
 
-// RunAsync starts the spinner within a gorutine. Returns a cancelFunc that stops the spinner.
-func (s *Spinner) RunAsync() context.CancelFunc {
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	go s.Run(ctx)
-	return func() {
-		fmt.Fprint(s.Out, clearLineAnsiSeq)
-		cancelFunc()
-	}
-}
-
-// Println can be used to print any text while the spinner is running. The spinner will be
-// temporarily cleared while text is being printed, and resume its state when done.
-// If the spinner is stopped text will be printed as expected.
 func (s *Spinner) Println(a ...any) {
-	s.isPrintingText = true
-	if s.isRunning {
-		if s.waitCtxCancel != nil {
-			s.waitCtxCancel()
-		}
-		fmt.Fprint(s.Out, clearLineAnsiSeq)
+	if s.isDone {
+		s.renderPrintln(a...)
+		return
 	}
 
+	s.printCh <- a
+}
+
+func (s *Spinner) run(ctx context.Context, printCh chan []any, doneCh chan struct{}) {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+
+	faces := s.Faces
+	faceIndex := s.renderFace(0, faces)
+
+	for {
+		select {
+		case <-ctx.Done():
+			s.clearLine()
+			doneCh <- struct{}{}
+			return
+		case <-ticker.C:
+			s.clearLine()
+			faceIndex = s.renderFace(faceIndex, faces)
+		case values := <-printCh:
+			s.clearLine()
+			s.renderPrintln(values...)
+		}
+	}
+}
+
+func (s *Spinner) renderPrintln(a ...any) {
 	fmt.Fprintln(s.Out, a...)
-	s.isPrintingText = false
+}
+
+func (s *Spinner) renderFace(index int, faces []string) int {
+	fmt.Fprint(s.Out, faces[index])
+	index++
+	if index == len(faces) {
+		return 0
+	}
+	return index
+}
+
+func (s *Spinner) clearLine() {
+	fmt.Fprint(s.Out, clearLineAnsiSeq)
 }
