@@ -67,7 +67,7 @@ func (s *Spinner) run(ctx context.Context, printCh chan []any) {
 		case values := <-printCh:
 			s.clearLine()
 			s.renderPrintln(values...)
-			faceIndex = s.renderFace(faceIndex, faces)
+			s.renderFace(faceIndex, faces)
 		}
 	}
 }
