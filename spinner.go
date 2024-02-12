@@ -13,30 +13,38 @@ const clearLineAnsiSeq = "\033[2K\r"
 var defaultFaces = []string{"|", "/", "—", "\\", "|", "/", "—", "\\"}
 
 func New(out io.Writer) *Spinner {
-	return &Spinner{Out: out, Faces: defaultFaces}
+	return &Spinner{Out: out, faces: defaultFaces}
+}
+
+func (s *Spinner) WithFaces(f []string) *Spinner {
+	s.faces = f
+	return s
 }
 
 func (s *Spinner) WithText(t string) *Spinner {
-	s.Text = t
+	s.text = t
 	return s
 }
 
 type Spinner struct {
 	Out   io.Writer
-	Faces []string
-	Text  string
+	faces []string
+	text  string
 
 	isDone  atomic.Bool
 	printCh chan []any
+	textCh  chan string
 }
 
 func (s *Spinner) Run(ctx context.Context) {
 	s.isDone.Swap(false)
 
 	printCh := make(chan []any)
+	textCh := make(chan string)
 
-	go s.run(ctx, printCh)
+	go s.run(ctx, printCh, textCh)
 	s.printCh = printCh
+	s.textCh = textCh
 }
 
 func (s *Spinner) Println(a ...any) {
@@ -44,16 +52,26 @@ func (s *Spinner) Println(a ...any) {
 		s.renderPrintln(a...)
 		return
 	}
-
 	s.printCh <- a
 }
 
-func (s *Spinner) run(ctx context.Context, printCh chan []any) {
+func (s *Spinner) SetText(t string) {
+	if s.isDone.Load() {
+		s.text = t
+		return
+	}
+	s.textCh <- t
+}
+
+func (s *Spinner) run(ctx context.Context, printCh chan []any, textCh chan string) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
+	defer close(printCh)
+	defer close(textCh)
 
-	faces := s.Faces
-	faceIndex := s.renderFace(0, faces)
+	text := s.text
+	faces := s.faces
+	faceIndex := s.renderFace(0, faces, text)
 
 	for {
 		select {
@@ -63,11 +81,13 @@ func (s *Spinner) run(ctx context.Context, printCh chan []any) {
 			return
 		case <-ticker.C:
 			s.clearLine()
-			faceIndex = s.renderFace(faceIndex, faces)
+			faceIndex = s.renderFace(faceIndex, faces, text)
+		case newText := <-textCh:
+			text = newText
 		case values := <-printCh:
 			s.clearLine()
 			s.renderPrintln(values...)
-			s.renderFace(faceIndex, faces)
+			s.renderFace(faceIndex, faces, text)
 		}
 	}
 }
@@ -76,10 +96,10 @@ func (s *Spinner) renderPrintln(a ...any) {
 	fmt.Fprintln(s.Out, a...)
 }
 
-func (s *Spinner) renderFace(index int, faces []string) int {
+func (s *Spinner) renderFace(index int, faces []string, text string) int {
 	str := faces[index]
-	if s.Text != "" {
-		str += " " + s.Text
+	if text != "" {
+		str += " " + text
 	}
 	fmt.Fprint(s.Out, str)
 	index++
