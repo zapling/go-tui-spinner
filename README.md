@@ -18,6 +18,9 @@ func main() {
     ctx, cancel := context.WithCancel(context.Background())
 
     s := spinner.New(os.Stdout)
+        WithText("Applying some things").
+        WithFaces([]string{"⣷", "⣯", "⣟", "⡿", "⢿", "⣻", "⣽", "⣾"})
+
     s.Run(ctx)
 
     s.Println("Some progress is being made")
