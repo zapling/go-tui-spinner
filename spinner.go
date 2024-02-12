@@ -33,15 +33,9 @@ type Spinner struct {
 func (s *Spinner) Run(ctx context.Context) {
 	s.isDone.Swap(false)
 
-	doneCh := make(chan struct{})
 	printCh := make(chan []any)
 
-	go func() {
-		<-doneCh
-		s.isDone.Swap(true)
-	}()
-
-	go s.run(ctx, printCh, doneCh)
+	go s.run(ctx, printCh)
 	s.printCh = printCh
 }
 
@@ -54,7 +48,7 @@ func (s *Spinner) Println(a ...any) {
 	s.printCh <- a
 }
 
-func (s *Spinner) run(ctx context.Context, printCh chan []any, doneCh chan struct{}) {
+func (s *Spinner) run(ctx context.Context, printCh chan []any) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -64,8 +58,8 @@ func (s *Spinner) run(ctx context.Context, printCh chan []any, doneCh chan struc
 	for {
 		select {
 		case <-ctx.Done():
+			s.isDone.Swap(true)
 			s.clearLine()
-			doneCh <- struct{}{}
 			return
 		case <-ticker.C:
 			s.clearLine()
